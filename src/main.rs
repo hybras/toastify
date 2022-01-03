@@ -1,6 +1,5 @@
-use clap::{ArgEnum, Args, Parser, Subcommand};
-use notify_rust::{error::Result as nResult, Hint, Notification, NotificationHandle, Urgency};
-use std::{path::PathBuf, str::FromStr};
+use clap::{ArgEnum, Parser, Subcommand};
+use notify_rust::{error::Result as nResult, Hint, Notification, Urgency};
 
 #[derive(ArgEnum, Clone, Copy)]
 pub enum UrgencyShim {
@@ -59,14 +58,14 @@ enum Commands {
 }
 
 #[cfg(all(unix, not(target_os = "macos")))]
-#[derive(Args)]
+#[derive(clap::Args)]
 struct LinuxArgs {
     /// Time until expiration in milliseconds.
     #[clap(short = 't', long)]
     expire_time: Option<i32>,
     /// Icon of notification.
     #[clap(short = 'i', long)]
-    icon: Option<PathBuf>,
+    icon: Option<std::path::PathBuf>,
     /// Specifies the ID and overrides existing notifications with the same ID.
     id: Option<u32>, // TODO: Type is u32 or string?
     /// Set a category.
