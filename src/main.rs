@@ -1,5 +1,5 @@
-use clap::{ArgEnum, Parser, Subcommand};
-use notify_rust::{Hint, Notification, Urgency, NotificationHandle, error::Result as nResult};
+use clap::{ArgEnum, Args, Parser, Subcommand};
+use notify_rust::{error::Result as nResult, Hint, Notification, NotificationHandle, Urgency};
 use std::{path::PathBuf, str::FromStr};
 
 #[derive(ArgEnum, Clone, Copy)]
@@ -57,34 +57,35 @@ enum Commands {
         /// Set a specific app-name manually.
         #[clap(short, long)]
         app_name: Option<String>,
-        /// Time until expiration in milliseconds.
         #[cfg(all(unix, not(target_os = "macos")))]
-        #[clap(short = 't', long)]
-        expire_time: Option<i32>,
-        /// Icon of notification.
-        #[cfg(all(unix, not(target_os = "macos")))]
-        #[clap(short = 'i', long)]
-        icon: Option<PathBuf>,
-        /// Specifies the ID and overrides existing notifications with the same ID.
-        #[cfg(all(unix, not(target_os = "macos")))]
-        id: Option<u32>, // TODO: Type is u32 or string?
-        /// Set a category.
-        #[cfg(all(unix, not(target_os = "macos")))]
-        #[clap(short, long)]
-        categories: Option<Vec<String>>,
-        /// Specifies basic extra data to pass. Valid types are int, double, string and byte. Pattern: TYPE:NAME:VALUE
-        #[cfg(all(unix, not(target_os = "macos")))]
-        #[clap(long)]
-        hint: Option<HintShim>,
-        /// How urgent is it.
-        #[cfg(all(unix, not(target_os = "macos")))]
-        #[clap(short, long, arg_enum)]
-        urgency: Option<UrgencyShim>,
-        /// Also prints notification to stdout
-        #[cfg(all(unix, not(target_os = "macos")))]
-        #[clap(short, long)]
-        debug: bool,
+        #[clap(flatten)]
+        linux_args: LinuxArgs,
     },
+}
+
+#[cfg(all(unix, not(target_os = "macos")))]
+#[derive(Args)]
+struct LinuxArgs {
+    /// Time until expiration in milliseconds.
+    #[clap(short = 't', long)]
+    expire_time: Option<i32>,
+    /// Icon of notification.
+    #[clap(short = 'i', long)]
+    icon: Option<PathBuf>,
+    /// Specifies the ID and overrides existing notifications with the same ID.
+    id: Option<u32>, // TODO: Type is u32 or string?
+    /// Set a category.
+    #[clap(short, long)]
+    categories: Option<Vec<String>>,
+    /// Specifies basic extra data to pass. Valid types are int, double, string and byte. Pattern: TYPE:NAME:VALUE
+    #[clap(long)]
+    hint: Option<HintShim>,
+    /// How urgent is it.
+    #[clap(short, long, arg_enum)]
+    urgency: Option<UrgencyShim>,
+    /// Also prints notification to stdout
+    #[clap(short, long)]
+    debug: bool,
 }
 
 fn main() -> nResult<()> {
@@ -131,19 +132,7 @@ fn main() -> nResult<()> {
             body,
             app_name,
             #[cfg(all(unix, not(target_os = "macos")))]
-            expire_time,
-            #[cfg(all(unix, not(target_os = "macos")))]
-            icon,
-            #[cfg(all(unix, not(target_os = "macos")))]
-            id,
-            #[cfg(all(unix, not(target_os = "macos")))]
-            categories,
-            #[cfg(all(unix, not(target_os = "macos")))]
-            hint,
-            #[cfg(all(unix, not(target_os = "macos")))]
-            urgency,
-            #[cfg(all(unix, not(target_os = "macos")))]
-            debug,
+            linux_args,
         } => {
             let mut notification = Notification::new();
 
@@ -159,6 +148,15 @@ fn main() -> nResult<()> {
 
             #[cfg(all(unix, not(target_os = "macos")))]
             {
+                let LinuxArgs {
+                    expire_time,
+                    icon,
+                    id,
+                    categories,
+                    hint,
+                    urgency,
+                    debug,
+                } = linux_args;
                 if let Some(id) = id {
                     notification.id(id);
                 }
@@ -189,12 +187,12 @@ fn main() -> nResult<()> {
                     notification.show_debug()
                 } else {
                     notification.show()
-                }.map(|_| ())
+                }
+                .map(|_| ())
             }
 
             #[cfg(target_os = "macos")]
             notification.show().map(|_| ())
-            
         }
     }
 }
