@@ -19,20 +19,15 @@ impl From<UrgencyShim> for Urgency {
     }
 }
 
-struct HintShim(Hint);
-
-impl FromStr for HintShim {
-    type Err = String;
-
-    fn from_str(pattern: &str) -> Result<Self, Self::Err> {
-        let parts = pattern.split(':').collect::<Vec<&str>>();
-        if parts.len() != 3 {
-            return Err("Wrong number of segments".into());
-        }
-        let (_typ, name, value) = (parts[0], parts[1], parts[2]);
-        Hint::from_key_val(name, value).map(|it| HintShim(it))
+fn parse_hint(pattern: &str) -> Result<Hint, String> {
+    let parts = pattern.split(':').collect::<Vec<&str>>();
+    if parts.len() != 3 {
+        return Err("Wrong number of segments".into());
     }
+    let (_typ, name, value) = (parts[0], parts[1], parts[2]);
+    Hint::from_key_val(name, value)
 }
+
 #[derive(Parser)]
 #[clap(author, version, about)]
 struct Cli {
@@ -78,8 +73,8 @@ struct LinuxArgs {
     #[clap(short, long)]
     categories: Option<Vec<String>>,
     /// Specifies basic extra data to pass. Valid types are int, double, string and byte. Pattern: TYPE:NAME:VALUE
-    #[clap(long)]
-    hint: Option<HintShim>,
+    #[clap(long, parse(try_from_str = parse_hint))]
+    hint: Option<Hint>,
     /// How urgent is it.
     #[clap(short, long, arg_enum)]
     urgency: Option<UrgencyShim>,
@@ -174,7 +169,7 @@ fn main() -> nResult<()> {
                 }
 
                 if let Some(hint) = hint {
-                    notification.hint(hint.0);
+                    notification.hint(hint);
                 }
 
                 if let Some(categories) = category {
