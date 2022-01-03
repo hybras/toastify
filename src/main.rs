@@ -171,7 +171,7 @@ fn main() -> nResult<()> {
                     notification.hint(hint);
                 }
 
-                if let Some(categories) = category {
+                if let Some(categories) = categories {
                     for category in categories {
                         notification.hint(Hint::Category(category));
                     }
