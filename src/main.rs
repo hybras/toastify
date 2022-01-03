@@ -1,6 +1,6 @@
 use clap::{ArgEnum, Parser, Subcommand};
-use std::{num::NonZeroU32, path::PathBuf, str::FromStr};
-use notify_rust::{Hint, Notification, Urgency};
+use notify_rust::{Hint, Notification, Urgency, NotificationHandle, error::Result as nResult};
+use std::{path::PathBuf, str::FromStr};
 
 #[derive(ArgEnum, Clone, Copy)]
 pub enum UrgencyShim {
@@ -58,28 +58,143 @@ enum Commands {
         #[clap(short, long)]
         app_name: Option<String>,
         /// Time until expiration in milliseconds.
+        #[cfg(all(unix, not(target_os = "macos")))]
         #[clap(short = 't', long)]
-        expire_time: Option<NonZeroU32>,
+        expire_time: Option<i32>,
         /// Icon of notification.
+        #[cfg(all(unix, not(target_os = "macos")))]
         #[clap(short = 'i', long)]
         icon: Option<PathBuf>,
         /// Specifies the ID and overrides existing notifications with the same ID.
+        #[cfg(all(unix, not(target_os = "macos")))]
         id: Option<u32>, // TODO: Type is u32 or string?
         /// Set a category.
+        #[cfg(all(unix, not(target_os = "macos")))]
         #[clap(short, long)]
-        category: Option<String>,
+        categories: Option<Vec<String>>,
         /// Specifies basic extra data to pass. Valid types are int, double, string and byte. Pattern: TYPE:NAME:VALUE
+        #[cfg(all(unix, not(target_os = "macos")))]
         #[clap(long)]
         hint: Option<HintShim>,
         /// How urgent is it.
+        #[cfg(all(unix, not(target_os = "macos")))]
         #[clap(short, long, arg_enum)]
         urgency: Option<UrgencyShim>,
         /// Also prints notification to stdout
+        #[cfg(all(unix, not(target_os = "macos")))]
         #[clap(short, long)]
         debug: bool,
     },
 }
 
-fn main() {
+fn main() -> nResult<()> {
     let args = Cli::parse();
+
+    match args.command {
+        #[cfg(all(unix, not(target_os = "macos")))]
+        Commands::Server => {
+            use notify_rust::server::NotificationServer;
+            use std::thread;
+            let server = NotificationServer::create();
+            thread::spawn(move || {
+                NotificationServer::start(&server, |notification| println!("{:#?}", notification))
+            });
+
+            println!("Press enter to exit.\n");
+
+            std::thread::sleep(std::time::Duration::from_millis(1_000));
+
+            Notification::new()
+                .summary("Notification Logger")
+                .body("If you can read this in the console, the server works fine.")
+                .show()
+                .expect("Was not able to send initial test message");
+
+            let mut _devnull = String::new();
+            let _ = std::io::stdin().read_line(&mut _devnull);
+            println!("Thank you for choosing toastify.");
+        }
+        #[cfg(all(unix, not(target_os = "macos")))]
+        Commands::Info => {
+            match notify_rust::get_server_information() {
+                Ok(info) => println!("server information:\n {:?}\n", info),
+                Err(error) => eprintln!("{}", error),
+            }
+
+            match notify_rust::get_capabilities() {
+                Ok(caps) => println!("capabilities:\n {:?}\n", caps),
+                Err(error) => eprintln!("{}", error),
+            }
+        }
+        Commands::Send {
+            title,
+            body,
+            app_name,
+            #[cfg(all(unix, not(target_os = "macos")))]
+            expire_time,
+            #[cfg(all(unix, not(target_os = "macos")))]
+            icon,
+            #[cfg(all(unix, not(target_os = "macos")))]
+            id,
+            #[cfg(all(unix, not(target_os = "macos")))]
+            categories,
+            #[cfg(all(unix, not(target_os = "macos")))]
+            hint,
+            #[cfg(all(unix, not(target_os = "macos")))]
+            urgency,
+            #[cfg(all(unix, not(target_os = "macos")))]
+            debug,
+        } => {
+            let mut notification = Notification::new();
+
+            notification.summary(&title);
+
+            if let Some(body) = body {
+                notification.body(&body);
+            }
+
+            if let Some(appname) = app_name {
+                notification.appname(&appname);
+            }
+
+            #[cfg(all(unix, not(target_os = "macos")))]
+            {
+                if let Some(id) = id {
+                    notification.id(id);
+                }
+
+                if let Some(icon) = icon {
+                    notification.icon(icon.to_str().expect("Icon path is not valid unicode"));
+                }
+
+                if let Some(timeout) = expire_time {
+                    notification.timeout(timeout);
+                }
+
+                if let Some(urgency) = urgency {
+                    notification.urgency(urgency.into())
+                }
+
+                if let Some(hint) = hint {
+                    notification.hint(hint.0);
+                }
+
+                if let Some(categories) = category {
+                    for category in categories {
+                        notification.hint(Hint::Category(category));
+                    }
+                }
+
+                if debug {
+                    notification.show_debug()
+                } else {
+                    notification.show()
+                }.map(|_| ())
+            }
+
+            #[cfg(target_os = "macos")]
+            notification.show().map(|_| ())
+            
+        }
+    }
 }
