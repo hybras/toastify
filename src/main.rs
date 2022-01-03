@@ -67,6 +67,7 @@ struct LinuxArgs {
     #[clap(short = 'i', long)]
     icon: Option<std::path::PathBuf>,
     /// Specifies the ID and overrides existing notifications with the same ID.
+    #[clap(long)]
     id: Option<u32>, // TODO: Type is u32 or string?
     /// Set a category.
     #[clap(short, long)]
